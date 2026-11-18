@@ -341,6 +341,10 @@
 
     // Auto-init on page load
     window.addEventListener("DOMContentLoaded", () => {
+      // Auto-detect server origin if opened over HTTP (e.g. from Laptop 2)
+      if (window.location.origin && window.location.origin.startsWith("http")) {
+        document.getElementById("apiUrlInput").value = window.location.origin;
+      }
       initMap();
       checkHealth();
     });

@@ -12,7 +12,7 @@ import time, os, sys, logging
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 
 # Ensure repo root is on sys.path
@@ -55,6 +55,14 @@ logger.info("Pipeline loaded successfully with %d trips.", len(pipeline.trip_ids
 
 class PredictRequest(BaseModel):
     trip_id: str
+
+@app.get("/")
+def serve_ui():
+    """Serves the evaluator UI directly to Laptop 2 browser."""
+    ui_path = PROJECT_ROOT / "ui" / "index.html"
+    if ui_path.exists():
+        return FileResponse(ui_path)
+    return {"message": "PathSnap API is live. Access /trips or /health."}
 
 @app.get("/health")
 def health():
