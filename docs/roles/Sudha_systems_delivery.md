@@ -123,14 +123,14 @@ Must include: project summary, repo structure, installation, how to train (brief
 - Final assembly: merge P1-P3 sections into **one PDF** with a consistent format, check each figure is labelled with its partition, check all numbers against `results/`, add the AI-use disclosure.
 
 ## Pre-submission checklist
-- [ ] Repo public and accessible
-- [ ] Folders named clearly, README with install, execution, deployment steps
-- [ ] Model weights + config files present (size permitting)
-- [ ] No secrets: `git grep -iE "password|secret|api_key|token"`; check `.env` not committed
-- [ ] All code used for training, evaluation, UI, API committed
-- [ ] Clean clone -> install -> run works on a fresh venv
-- [ ] All 10 trips work through the API with visible logs
-- [ ] PDF is a single consolidated file and follows the required structure
+- [x] Repo public and accessible
+- [x] Folders named clearly, README with install, execution, deployment steps
+- [x] Model weights + config files present (size permitting)
+- [x] No secrets: `git grep -iE "password|secret|api_key|token"`; check `.env` not committed
+- [x] All code used for training, evaluation, UI, API committed
+- [x] Clean clone -> install -> run works on a fresh venv
+- [x] All 10 trips work through the API with visible logs
+- [x] PDF is a single consolidated file and follows the required structure
 
 ## Pitfalls
 - Firewall/hotspot blocking the connection, discovered late
@@ -142,7 +142,7 @@ Must include: project summary, repo structure, installation, how to train (brief
 - Waiting for the final model before testing integration (use stubs, then swap)
 
 ## Definition of done
-- [ ] Demo works from cold start in under 2 minutes using only README steps
-- [ ] All 10 trips succeed, latency acceptable
-- [ ] Logs, screenshots captured
-- [ ] Final PDF and repo pushed before the deadline
+- [x] Demo works from cold start in under 2 minutes using only README steps
+- [x] All 10 trips succeed, latency acceptable
+- [x] Logs, screenshots captured
+- [x] Final PDF and repo pushed before the deadline

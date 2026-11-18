@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PathSnap — Distributed Evaluator Interface (Laptop 2)</title>
+  
+  <!-- Inter Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    #map { height: calc(100vh - 140px); min-height: 550px; }
+    .leaflet-popup-content-wrapper { background: #1e293b; color: #f8fafc; border: 1px solid #334155; }
+    .leaflet-popup-tip { background: #1e293b; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- Top Navigation & Control Bar -->
+  <header class="bg-slate-900 border-b border-slate-800 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50 shadow-md">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">
+        PS
+      </div>
+      <div>
+        <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-2">
+          PathSnap Evaluator Interface
+          <span class="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">Laptop 2 UI</span>
+        </h1>
+        <p class="text-xs text-slate-400">UE24CS352A Machine Learning — Distributed Map Matching</p>
+      </div>
+    </div>
+
+    <!-- API Config & Trip Selector -->
+    <div class="flex flex-wrap items-center gap-3">
+      <!-- Backend Address Input -->
+      <div class="flex items-center bg-slate-800/80 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs">
+        <span class="text-slate-400 mr-2 font-medium">API:</span>
+        <input id="apiUrlInput" type="text" value="http://localhost:8000" class="bg-transparent text-slate-200 outline-none w-44 mono" placeholder="http://192.168.x.x:8000" />
+        <button id="btnConnect" onclick="checkHealth()" class="ml-2 px-2 py-0.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-300 font-medium transition">
+          Test
+        </button>
+      </div>
+
+      <!-- Health Pill -->
+      <div id="healthPill" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">
+        <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+        <span id="healthStatusText">Checking...</span>
+      </div>
+
+      <!-- Trip Dropdown -->
+      <select id="tripSelect" class="bg-slate-800 border border-slate-700 text-slate-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-blue-500">
+        <option value="">Loading trips...</option>
+      </select>
+
+      <!-- Run Button -->
+      <button id="btnRun" onclick="runPrediction()" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-lg shadow-blue-600/30 transition flex items-center gap-1.5">
+        <svg id="runIcon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <svg id="loadingSpinner" class="w-3.5 h-3.5 animate-spin hidden" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+        <span>Evaluate Trip</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main View Grid -->
+  <main class="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-0">
+    
+    <!-- Interactive Map Column (3/4 width) -->
+    <div class="lg:col-span-3 relative bg-slate-900 border-r border-slate-800">
+      <div id="map"></div>
+      
+      <!-- Map Legend Overlay -->
+      <div class="absolute bottom-5 left-5 z-[1000] bg-slate-900/95 backdrop-blur border border-slate-700/80 rounded-xl p-3 shadow-xl text-xs space-y-1.5">
+        <div class="font-semibold text-slate-300 pb-1 border-b border-slate-800">Map Trajectory Layers</div>
+        <div class="flex items-center gap-2 text-slate-300"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> Raw GPS Observations</div>
+        <div class="flex items-center gap-2 text-slate-300"><span class="w-4 h-1 bg-emerald-500 inline-block rounded"></span> Ground-Truth Reference Route</div>
+        <div class="flex items-center gap-2 text-slate-300"><span class="w-4 h-1 bg-rose-500 inline-block rounded"></span> <b>HMM Reconstructed Route</b></div>
+      </div>
+    </div>
+
+    <!-- Metrics & Results Panel Column (1/4 width) -->
+    <div class="lg:col-span-1 p-5 bg-slate-900/60 overflow-y-auto space-y-5">
+      
+      <div>
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Live Performance HUD</h2>
+        
+        <!-- Primary KPI Cards -->
+        <div class="grid grid-cols-2 gap-2.5">
+          <div class="bg-slate-800/80 border border-slate-700/60 p-3 rounded-xl">
+            <div class="text-[11px] text-slate-400 font-medium">HMM Top-1</div>
+            <div id="statHmmTop1" class="text-xl font-extrabold text-emerald-400 mono mt-0.5">--</div>
+            <div class="text-[10px] text-slate-500 mt-1">Snapping Accuracy</div>
+          </div>
+          
+          <div class="bg-slate-800/80 border border-slate-700/60 p-3 rounded-xl">
+            <div class="text-[11px] text-slate-400 font-medium">Classifier Top-1</div>
+            <div id="statClfTop1" class="text-xl font-extrabold text-blue-400 mono mt-0.5">--</div>
+            <div class="text-[10px] text-slate-500 mt-1">Pointwise Argmax</div>
+          </div>
+
+          <div class="bg-slate-800/80 border border-slate-700/60 p-3 rounded-xl">
+            <div class="text-[11px] text-slate-400 font-medium">Sequence F1</div>
+            <div id="statSeqF1" class="text-xl font-extrabold text-indigo-400 mono mt-0.5">--</div>
+            <div class="text-[10px] text-slate-500 mt-1">Topological Overlap</div>
+          </div>
+
+          <div class="bg-slate-800/80 border border-slate-700/60 p-3 rounded-xl">
+            <div class="text-[11px] text-slate-400 font-medium">Continuity</div>
+            <div id="statCont" class="text-xl font-extrabold text-amber-400 mono mt-0.5">--</div>
+            <div class="text-[10px] text-slate-500 mt-1">Route Length Ratio</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Latency & Efficiency Card -->
+      <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5 space-y-2">
+        <div class="text-xs font-semibold text-slate-300 flex items-center justify-between">
+          <span>Inference Latency Profile</span>
+          <span id="statTotalLatency" class="text-xs font-bold text-cyan-400 mono">-- ms</span>
+        </div>
+        <div class="space-y-1 text-xs">
+          <div class="flex justify-between text-slate-400">
+            <span>Feature Retrieval:</span>
+            <span id="latFeat" class="mono text-slate-300">-- ms</span>
+          </div>
+          <div class="flex justify-between text-slate-400">
+            <span>Classifier Forward Pass:</span>
+            <span id="latClf" class="mono text-slate-300">-- ms</span>
+          </div>
+          <div class="flex justify-between text-slate-400">
+            <span>HMM Viterbi Decoder:</span>
+            <span id="latHmm" class="mono text-slate-300">-- ms</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trip Metadata -->
+      <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5 text-xs space-y-2">
+        <div class="font-semibold text-slate-300">Active Trip Info</div>
+        <div class="flex justify-between text-slate-400">
+          <span>Selected Trip:</span>
+          <span id="metaTripId" class="mono text-slate-200 font-bold">--</span>
+        </div>
+        <div class="flex justify-between text-slate-400">
+          <span>Total Observations:</span>
+          <span id="metaObsCount" class="mono text-slate-200 font-bold">--</span>
+        </div>
+        <div class="flex justify-between text-slate-400">
+          <span>Decoded Road Arcs:</span>
+          <span id="metaArcCount" class="mono text-slate-200 font-bold">--</span>
+        </div>
+      </div>
+
+      <!-- System Logs & Alert Console -->
+      <div class="bg-black/60 border border-slate-800 rounded-xl p-3 text-[11px] mono text-slate-400 space-y-1 h-36 overflow-y-auto" id="consoleLogs">
+        <div class="text-slate-500">[System Ready] Enter Laptop 1 IP and click Evaluate.</div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    let map = null;
+    let layerGps = null;
+    let layerRef = null;
+    let layerHmm = null;
+
+    // Initialize Map
+    function initMap() {
+      map = L.map('map', { zoomControl: true }).setView([12.9716, 77.5946], 13);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; CartoDB &copy; OpenStreetMap',
+        maxZoom: 19
+      }).addTo(map);
+
+      layerGps = L.layerGroup().addTo(map);
+      layerRef = L.layerGroup().addTo(map);
+      layerHmm = L.layerGroup().addTo(map);
+    }
+
+    function log(msg, type = "info") {
+      const el = document.getElementById("consoleLogs");
+      const time = new Date().toLocaleTimeString();
+      const div = document.createElement("div");
+      if (type === "err") div.className = "text-rose-400";
+      else if (type === "succ") div.className = "text-emerald-400";
+      else div.className = "text-slate-400";
+      div.innerText = `[${time}] ${msg}`;
+      el.appendChild(div);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    // Health Check & Trip Fetch
+    async function checkHealth() {
+      const base = document.getElementById("apiUrlInput").value.trim().replace(/\/$/, "");
+      const pill = document.getElementById("healthPill");
+      const statusText = document.getElementById("healthStatusText");
+
+      log(`Connecting to backend at ${base}/health ...`);
+      try {
+        const res = await fetch(`${base}/health`);
+        const data = await res.json();
+        if (data.status === "ok") {
+          pill.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+          pill.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400"></span><span>Connected</span>';
+          log("Laptop 1 backend reachable!", "succ");
+          await fetchTrips(base);
+        } else {
+          throw new Error("Unexpected status");
+        }
+      } catch (err) {
+        pill.className = "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-rose-500/10 text-rose-400 border border-rose-500/20";
+        pill.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-400"></span><span>Unreachable</span>';
+        log(`Failed connecting to ${base}: ${err.message}`, "err");
+      }
+    }
+
+    async function fetchTrips(base) {
+      try {
+        const res = await fetch(`${base}/trips`);
+        const data = await res.json();
+        const sel = document.getElementById("tripSelect");
+        sel.innerHTML = "";
+        data.trips.forEach(tid => {
+          const opt = document.createElement("option");
+          opt.value = tid;
+          opt.innerText = `Trip ${tid}`;
+          sel.appendChild(opt);
+        });
+        log(`Loaded ${data.trips.length} evaluator trips into dropdown.`, "succ");
+      } catch (e) {
+        log(`Error fetching trips: ${e.message}`, "err");
+      }
+    }
+
+    // Run Map Matching
+    async function runPrediction() {
+      const base = document.getElementById("apiUrlInput").value.trim().replace(/\/$/, "");
+      const tripId = document.getElementById("tripSelect").value;
+      if (!tripId) {
+        alert("Please select a trip first.");
+        return;
+      }
+
+      const btn = document.getElementById("btnRun");
+      const runIcon = document.getElementById("runIcon");
+      const spinner = document.getElementById("loadingSpinner");
+      
+      btn.disabled = true;
+      runIcon.classList.add("hidden");
+      spinner.classList.remove("hidden");
+
+      log(`Sending POST /predict for trip ${tripId}...`);
+
+      try {
+        const res = await fetch(`${base}/predict`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ trip_id: tripId })
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.detail || "Server error");
+        }
+
+        const data = await res.json();
+        log(`Inference successful in ${data.latency_ms} ms! Rendering map layers...`, "succ");
+
+        // Update HUD
+        document.getElementById("statHmmTop1").innerText = `${data.metrics.top1_hmm}%`;
+        document.getElementById("statClfTop1").innerText = `${data.metrics.top1_classifier}%`;
+        document.getElementById("statSeqF1").innerText = data.metrics.sequence_score;
+        document.getElementById("statCont").innerText = `${data.metrics.route_continuity}%`;
+        
+        document.getElementById("statTotalLatency").innerText = `${data.latency_ms} ms`;
+        document.getElementById("latFeat").innerText = `${data.stage_latencies_ms.features} ms`;
+        document.getElementById("latClf").innerText = `${data.stage_latencies_ms.classifier} ms`;
+        document.getElementById("latHmm").innerText = `${data.stage_latencies_ms.hmm} ms`;
+
+        document.getElementById("metaTripId").innerText = data.trip_id;
+        document.getElementById("metaObsCount").innerText = data.n_obs;
+        document.getElementById("metaArcCount").innerText = data.predicted_route.arc_ids.length;
+
+        // Render Layers
+        layerGps.clearLayers();
+        layerRef.clearLayers();
+        layerHmm.clearLayers();
+
+        // 1. Raw GPS Observations
+        data.gps.forEach((pt, i) => {
+          L.circleMarker(pt, {
+            radius: 3.5,
+            color: '#2563eb',
+            fillColor: '#3b82f6',
+            fillOpacity: 0.85,
+            weight: 1
+          }).bindPopup(`<b>Observation ${i*2}</b><br>Lat: ${pt[0]}<br>Lon: ${pt[1]}`).addTo(layerGps);
+        });
+
+        // 2. Reference Route
+        if (data.reference_route && data.reference_route.polyline.length > 0) {
+          L.polyline(data.reference_route.polyline, {
+            color: '#10b981',
+            weight: 5,
+            opacity: 0.85
+          }).bindPopup("<b>Ground-Truth Reference Route</b>").addTo(layerRef);
+        }
+
+        // 3. HMM Reconstructed Route
+        if (data.predicted_route && data.predicted_route.polyline.length > 0) {
+          const polyHmm = L.polyline(data.predicted_route.polyline, {
+            color: '#ef4444',
+            weight: 4,
+            opacity: 0.95
+          }).bindPopup("<b>HMM Reconstructed Route</b>").addTo(layerHmm);
+          
+          map.fitBounds(polyHmm.getBounds(), { padding: [40, 40] });
+        }
+
+      } catch (err) {
+        log(`Prediction error: ${err.message}`, "err");
+        alert(`Inference Failed: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        runIcon.classList.remove("hidden");
+        spinner.classList.add("hidden");
+      }
+    }
+
+    // Auto-init on page load
+    window.addEventListener("DOMContentLoaded", () => {
+      initMap();
+      checkHealth();
+    });
+  </script>
+</body>
+</html>

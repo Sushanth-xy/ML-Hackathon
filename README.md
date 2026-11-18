@@ -450,20 +450,56 @@ Every number in the PDF must be reproducible from a file in `results/`.
 
 ---
 
-## 13. Running the System (Fill in as components land)
+## 13. Running the Live Two-Laptop Demonstration
+
+### Step 1: Connect Both Laptops to the Same Local Network
+- Connect **Laptop 1** (Backend Server) and **Laptop 2** (Evaluator UI) to the **same Wi-Fi network** or a **Phone Mobile Hotspot** (recommended to bypass university client isolation).
+
+---
+
+### Step 2: Laptop 1 (FastAPI Backend Server)
+1. **Find your local IP address:**
+   - **macOS / Linux:** `ifconfig | grep "inet " | grep -v 127.0.0.1` (look for `192.168.x.x` or `172.20.x.x`)
+   - **Windows:** `ipconfig` (IPv4 Address)
+2. **Install requirements (if not already installed):**
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. **Launch the FastAPI API server:**
+   ```bash
+   python -m uvicorn api.main:app --host 0.0.0.0 --port 8000
+   ```
+   *The server loads the ML models, scaler, HMM config, and road networks once at startup and binds to `0.0.0.0:8000`.*
+   *Keep this terminal window open during evaluation to display live request logs!*
+
+---
+
+### Step 3: Laptop 2 (Evaluator Client Interface)
+1. **Open the Evaluator UI in any modern browser:**
+   - Option A: Simply double-click or open `ui/index.html` in Chrome/Edge/Firefox/Safari.
+   - Option B: Serve locally on Laptop 2:
+     ```bash
+     python -m http.server 3000
+     ```
+     and open `http://localhost:3000/ui/index.html`.
+2. **Connect to Laptop 1:**
+   - In the top header "API:" input field, replace `localhost` with Laptop 1's IP address:
+     ```
+     http://<laptop-1-ip>:8000
+     ```
+   - Click **"Test"**. The status pill will change from amber to green **"Connected"** and populate the dropdown with all 10 evaluator trips (`00000000`, `00000007`, ..., `00000091`).
+3. **Run Evaluation:**
+   - Select any trip from the dropdown and click **"Evaluate Trip"**.
+   - The UI will display:
+     - **Blue markers:** Raw GPS observations with coordinates.
+     - **Green route:** Ground-truth reference path.
+     - **Red route:** HMM reconstructed map-matched path.
+     - **HUD Cards:** HMM Top-1 accuracy, Classifier Top-1, Sequence F1 score, Route Continuity %, and millisecond latency profile.
+
+---
+
+### Step 4: Verification & Smoke Test
+Run automated pipeline tests across all 10 student trips:
 ```bash
-# P1: build candidates
-python -m src.candidates --out data/processed/candidates.parquet
-
-# P2: train one model
-python training/run_model.py --model xgb --config training/configs/xgb.yaml
-
-# P2: Bayesian optimisation
-python training/bayes_opt.py --model xgb --trials 60
-
-# P4: start API (Laptop 1)
-uvicorn api.main:app --host 0.0.0.0 --port 8000
-
-# P4: start UI (Laptop 2)
-streamlit run ui/app.py   # set API_URL=http://<laptop1-ip>:8000
+python -c "from src.pipeline import Pipeline; p = Pipeline(); [print(t, p.run(t)['metrics']) for t in p.trip_ids]"
 ```
