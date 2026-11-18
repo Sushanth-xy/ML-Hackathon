@@ -43,10 +43,23 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
+@app.middleware("http")
+async def add_universal_cors(request: Request, call_next):
+    if request.method == "OPTIONS":
+        from starlette.responses import Response
+        res = Response(status_code=204)
+    else:
+        res = await call_next(request)
+    res.headers["Access-Control-Allow-Origin"] = "*"
+    res.headers["Access-Control-Allow-Methods"] = "*"
+    res.headers["Access-Control-Allow-Headers"] = "*"
+    res.headers["Access-Control-Allow-Private-Network"] = "true"
+    return res
 
 # Pre-load pipeline once at module load
 print("[API] Initializing PathSnap pipeline (Laptop 1)...")
