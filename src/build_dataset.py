@@ -4,14 +4,44 @@ PathSnap - Step 1: raw files -> candidate-ranking table.
 One row = (trip_id, point_idx, candidate arc). label=1 if that arc is the
 reference arc the GPS point was aligned to.
 
-Run:  python src/build_dataset.py "Student folder"
+Run:  python src/build_dataset.py            (auto-finds the dataset folder)
+  or: python src/build_dataset.py "C:/path/to/Student folder"
 Out:  data/train_candidates.csv, data/student_test_candidates.csv, data/build_report.csv
+      (always written inside the project root, whatever folder you run from)
 """
-import sys, os, glob
+import sys, os, glob, zipfile
+from pathlib import Path
 import numpy as np, pandas as pd
 from scipy.spatial import cKDTree
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent   # folder that contains src/
+DATA_DIR = PROJECT_ROOT / "data"
+
+def _is_root(p):
+    return (p / "train").is_dir() and (p / "student_test").is_dir()
+
+def find_data_root(arg=None):
+    """Locate the dataset folder (the one holding train/ and student_test/).
+    Order: CLI argument -> common names in project -> search project -> unzip Student_folder.zip."""
+    cands = []
+    if arg: cands.append(Path(arg))
+    cands += [PROJECT_ROOT / "Student folder", PROJECT_ROOT / "Student_folder",
+              PROJECT_ROOT / "data-preprocessing" / "Student folder"]
+    for c in cands:
+        if _is_root(c): return c
+    for p in PROJECT_ROOT.rglob("student_test"):
+        if p.is_dir() and _is_root(p.parent): return p.parent
+    for z in [PROJECT_ROOT / "Student_folder.zip", Path.home() / "Downloads" / "Student_folder.zip"]:
+        if z.exists():
+            print(f"Dataset folder not found - extracting {z} into project ...")
+            zipfile.ZipFile(z).extractall(PROJECT_ROOT)
+            for c in [PROJECT_ROOT / "Student folder", PROJECT_ROOT / "Student_folder"]:
+                if _is_root(c): return c
+    raise SystemExit("ERROR: could not find the dataset folder (needs train/ and student_test/ inside).\n"
+                     f"Looked in: {PROJECT_ROOT}\nFix: pass the path, e.g.  python src/build_dataset.py \"C:/path/to/Student folder\"")
+
 K = 12            # candidates per GPS point
+MAX_ALIGN_M = 30.0  # points further than this from every route arc are 'unlabeled'
 R_EARTH = 6371000.0
 
 # ---------- loading ----------
@@ -116,27 +146,42 @@ def process_trip(folder, split):
             rows.append((tid, i, int(c[r]), int(c[r] == true_arc[i]), split,
                          d[r], d[r] - d[0], r, f[r], dh[r], np.cos(dh[r]) if moving[i] else 0.0,
                          alen[c[r]], spd[i], dt[i], d_prev[i],
-                         deg_out[arcs[c[r], 1]], deg_in[arcs[c[r], 0]], int(has_rev[c[r]])))
+                         deg_out[arcs[c[r], 1]], deg_in[arcs[c[r], 0]], int(has_rev[c[r]]),
+                         int(moving[i]), r_dist[i], int(r_dist[i] <= MAX_ALIGN_M)))
     cols = ["trip_id", "point_idx", "cand_arc_id", "label", "split",
             "dist_m", "dist_minus_min", "dist_rank", "frac_along", "heading_diff", "heading_cos",
-            "arc_len", "speed", "dt", "step_dist", "end_deg_out", "start_deg_in", "has_reverse"]
+            "arc_len", "speed", "dt", "step_dist", "end_deg_out", "start_deg_in", "has_reverse",
+            "is_moving", "align_dist", "labeled"]
     df = pd.DataFrame(rows, columns=cols)
+    # missing-value handling (fit-free constants, so no leakage):
+    #  first point has no previous step -> speed/step_dist 0, dt nominal 1 s
+    #  heading undefined when (almost) stationary -> 0 rad diff, flagged by is_moving=0
+    df["speed"] = df["speed"].fillna(0.0)
+    df["step_dist"] = df["step_dist"].fillna(0.0)
+    df["dt"] = df["dt"].fillna(1.0)
+    df["heading_diff"] = df["heading_diff"].fillna(0.0)
     info = dict(trip_id=tid, split=split, n_points=n, n_nodes=len(nodes), n_arcs=len(arcs),
                 route_len=len(route), miss_rate=miss / n, align_med_dist_m=float(np.median(r_dist)),
-                pct_dt_1s=float(np.mean(dt[1:] == 1)), max_gap_s=float(np.nanmax(dt)))
+                pct_dt_1s=float(np.mean(dt[1:] == 1)), pct_unlabeled=float(np.mean(r_dist > MAX_ALIGN_M)),
+                route_km=float(np.linalg.norm(B[route]-A[route],axis=1).sum()/1000), gps_path_km=float(d_prev[1:].sum()/1000), max_gap_s=float(np.nanmax(dt)))
     return df, info
 
-def main(root):
-    os.makedirs("data", exist_ok=True)
+def main(root=None):
+    root = find_data_root(root)
+    print("Using dataset folder:", root)
+    DATA_DIR.mkdir(exist_ok=True)
     infos = []
-    for split, sub in [("train", "train"), ("student_test", "student_test")]:
+    for split in ["train", "student_test"]:
         dfs = []
-        for folder in sorted(glob.glob(os.path.join(root, sub, "*"))):
+        folders = sorted(glob.glob(os.path.join(str(root), split, "*")))
+        if not folders: raise SystemExit(f"ERROR: no trip folders in {os.path.join(str(root), split)}")
+        for folder in folders:
             df, info = process_trip(folder, split)
             dfs.append(df); infos.append(info)
-            print(split, info["trip_id"], f"pts={info['n_points']} miss={info['miss_rate']:.3f}")
-        pd.concat(dfs).to_csv(f"data/{split}_candidates.csv", index=False)
-    pd.DataFrame(infos).to_csv("data/build_report.csv", index=False)
+            print(split, info["trip_id"], f"pts={info['n_points']} miss={info['miss_rate']:.3f} unlabeled={info['pct_unlabeled']:.3f}")
+        pd.concat(dfs).to_csv(DATA_DIR / f"{split}_candidates.csv", index=False)
+    pd.DataFrame(infos).to_csv(DATA_DIR / "build_report.csv", index=False)
+    print("Done. Files written to", DATA_DIR)
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else "Student folder")
+    main(sys.argv[1] if len(sys.argv) > 1 else None)

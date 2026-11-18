@@ -1,0 +1,3 @@
+partition,trips,points_total,points_median,nodes_median,arcs_median,missing_values,trips_with_gaps_gt5s,trips_disconnected_network
+student_test,10,19160,1420.0,6596.5,13145.0,0,2,10
+train,80,208417,1529.0,9608.0,19526.5,0,45,79
