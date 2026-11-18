@@ -1,0 +1,6 @@
+Model,Algorithm Family,Top-1 Accuracy,Student-Test Macro F1,Log Loss,Train Time (s),Inference (ms/1k)
+Logistic Regression,Linear,80.23%,0.7463,0.2517,0.7s,0.02ms
+Gaussian Naive Bayes,Probabilistic,81.39%,0.6288,1.1779,0.0s,0.07ms
+Random Forest,Ensemble (Bagging),84.05%,0.8762,0.1327,6.0s,0.47ms
+HistGradientBoosting,Boosting (Tree),84.70%,0.8635,0.1353,9.0s,0.95ms
+Multi-Layer Perceptron (MLP),Neural Network,84.14%,0.9129,0.0702,7.4s,0.27ms
