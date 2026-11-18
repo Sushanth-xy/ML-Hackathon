@@ -1,0 +1,7 @@
+Combo Identifier,Configuration Details,Top-1 Accuracy,Macro F1,Log Loss,Train Time (s),Inference (ms/1k)
+HistGB-Default,"iter=100, depth=6, lr=0.1",84.45%,0.9167,0.0678,1.3s,0.80ms
+HistGB-FastRate,"iter=150, depth=8, lr=0.15",84.25%,0.9160,0.0691,1.3s,0.58ms
+HistGB-Conservative,"iter=200, depth=8, lr=0.05, l2=1.0",84.62%,0.9173,0.0670,2.7s,1.59ms
+HistGB-DeepTuned,"iter=280, depth=10, lr=0.04, l2=2.5, leaf=30 (OPTIMIZED)",84.34%,0.8687,0.1272,3.6s,2.20ms
+MLP-Shallow,"layers=(64,32), alpha=1e-4",84.38%,0.9146,0.0692,7.3s,0.23ms
+MLP-DeepTuned,"layers=(128,64,32), alpha=1e-3, early_stop (OPTIMIZED)",83.90%,0.9135,0.0695,16.8s,0.74ms
