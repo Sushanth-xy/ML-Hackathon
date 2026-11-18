@@ -4,3 +4,6 @@ Gaussian Naive Bayes,Probabilistic,81.39%,0.6288,1.1779,0.0s,0.07ms
 Random Forest,Ensemble (Bagging),84.05%,0.8762,0.1327,6.0s,0.47ms
 HistGradientBoosting,Boosting (Tree),84.70%,0.8635,0.1353,9.0s,0.95ms
 Multi-Layer Perceptron (MLP),Neural Network,84.14%,0.9129,0.0702,7.4s,0.27ms
+AdaBoost,Boosting (Adaptive),81.98%,0.4786,0.2703,19.9s,1.89ms
+GradientBoosting (GBDT),Boosting (Sequential),84.09%,0.9153,0.0676,100.7s,0.89ms
+1D-CNN (PyTorch),Deep Learning (CNN),82.88%,0.8258,0.1769,103.8s,21.91ms

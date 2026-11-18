@@ -5,6 +5,8 @@ __pycache__/
 data/raw/
 data/*_candidates.csv
 *.parquet
-*.joblib
 *.ubj
 *.log
+*.joblib
+!artifacts/*.joblib
+!artifacts/*.pth

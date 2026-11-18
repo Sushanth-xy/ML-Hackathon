@@ -17,7 +17,48 @@ Team project for UE24CS352A Machine Learning (PES University). PathSnap reconstr
 
 ---
 
-## 2. Evaluation Schedule & Panel Viva Defense Guide
+## 2. Live Experimental Benchmark & Results
+
+> **Status: Phase 1 Preprocessing & Multi-Model Training Complete.** All metrics below are empirically measured and reproducible using `src/build_dataset.py` and `training/train_models.py`.
+
+### 2.1 Preprocessing & Candidate Generation Statistics
+*(Generated from 90 trips in `Student folder/`, logged in [`data/build_report.csv`](./data/build_report.csv))*
+
+| Metric | Training Partition (80 Trips) | Student-Test Partition (10 Trips) | Overall / Notes |
+|---|---|---|---|
+| **Total Candidates Evaluated** | **2,501,004 rows** | **229,920 rows** | $K=12$ candidate arcs per observation |
+| **Average GPS Points / Trip** | 2,605 points | 1,916 points | Trajectories range from 262 to 19,313 points |
+| **Candidate Miss Rate ($K=12$)** | **3.48%** | **1.35%** | True road segment absent from candidates |
+| **Candidate Recall Ceiling** | **96.52%** | **98.65%** | Hard upper bound on downstream ML accuracy |
+| **Median GPS-to-Arc Alignment** | 8.16 meters | 5.08 meters | Within civilian GPS urban noise bounds |
+| **1-Second Step Consistency (`dt=1s`)**| 93.8% | 98.2% | ~2-6% jitter/dropouts handled via kinematic $dt$ |
+
+---
+
+### 2.2 Comprehensive Model Zoo Benchmark Comparison (8 Models)
+*(Evaluated on the held-out 10 Student-Test trips, 229,920 candidate rows; logged in [`results/models/comparison.csv`](./results/models/comparison.csv))*
+
+| Model | Algorithm Family | Top-1 Pointwise Accuracy | Student-Test Macro F1 | Log Loss (Cross-Entropy) | Training Time | CPU Inference Latency (per 1k rows) |
+|---|---|---|---|---|---|---|
+| **Logistic Regression** | Linear | 80.23% | 0.7463 | 0.2517 | 0.7s | **0.02 ms** |
+| **Gaussian Naive Bayes** | Probabilistic | 81.39% | 0.6288 | 1.1779 | **0.0s** | 0.07 ms |
+| **Random Forest** | Ensemble (Bagging) | 84.05% | 0.8762 | 0.1327 | 6.0s | 0.47 ms |
+| **HistGradientBoosting** *(Top Pick)*| Boosting (Histogram Tree) | **84.70%** | 0.8635 | 0.1353 | 9.0s | 0.95 ms |
+| **GradientBoosting (GBDT)** | Boosting (Sequential Tree) | 84.09% | **0.9153** | **0.0676** | 100.7s | 0.89 ms |
+| **AdaBoost** | Boosting (Adaptive) | 81.98% | 0.4786 | 0.2703 | 19.9s | 1.89 ms |
+| **Multi-Layer Perceptron (MLP)** | Neural Network (Dense) | 84.14% | 0.9129 | 0.0702 | 7.4s | 0.27 ms |
+| **1D-CNN (PyTorch)** | Deep Learning (Convolutional) | 82.88% | 0.8258 | 0.1769 | 103.8s | 21.91 ms |
+
+#### Key Empirical Takeaways:
+1. **HistGradientBoosting Leads Pointwise Accuracy (84.70%):** Histogram binning enables fast, highly accurate decision splits across continuous distance and heading boundaries.
+2. **GBDT and MLP Excel in Probability Calibration & Macro F1 (F1 > 0.91, Loss < 0.07):** Both models effectively optimize cross-entropy loss under class imbalance, producing low-loss calibrated likelihoods optimal for HMM emissions.
+3. **1D-CNN Validation:** Demonstrates that local 1D convolutional feature extractors over kinematic/geometric feature channels learn valid discriminative representations (82.88% Top-1), though standard GBDT remains more computationally efficient for tabular inference.
+4. **Gaussian Naive Bayes Calibration Breakdown:** Shows an inflated Log Loss (1.1779) due to conditional dependence between features (e.g., `dist_m` and `dist_rank`), serving as a textbook illustration of why generative models with independence assumptions struggle on geometric tables.
+5. **Real-Time Edge Readiness:** GBDT, HistGB, RF, and MLP easily meet the latency budgets (< 1 ms per 1,000 rows on CPU), ensuring Laptop 1 meets real-time evaluation constraints.
+
+---
+
+## 3. Evaluation Schedule & Panel Viva Defense Guide
 
 > **All team members must read and master this section.** Evaluators may direct questions to any member regardless of role to test individual understanding and authenticity.
 
