@@ -206,6 +206,26 @@ class Pipeline:
                 u, v = arcs[aid]
                 ref_coords.append([float(nodes[u][1]), float(nodes[u][0])])
                 ref_coords.append([float(nodes[v][1]), float(nodes[v][0])])
+                
+        # Classifier-only Route Polyline
+        compressed_clf = compress_consecutive_arcs([a for a in clf_pred_arcs if a >= 0])
+        clf_coords = []
+        for aid in compressed_clf:
+            if 0 <= aid < len(arcs):
+                u, v = arcs[aid]
+                clf_coords.append([float(nodes[u][1]), float(nodes[u][0])])
+                clf_coords.append([float(nodes[v][1]), float(nodes[v][0])])
+                
+        # Background Road Network Arcs (candidate segments)
+        cand_arcs = set(trip_cands["cand_arc_id"].unique())
+        network_segments = []
+        for aid in cand_arcs:
+            if 0 <= aid < len(arcs):
+                u, v = arcs[aid]
+                network_segments.append([
+                    [float(nodes[u][1]), float(nodes[u][0])],
+                    [float(nodes[v][1]), float(nodes[v][0])]
+                ])
             
         total_latency = (time.perf_counter() - t_start) * 1000.0
         
@@ -217,9 +237,14 @@ class Pipeline:
                 "arc_ids": compressed_hmm,
                 "polyline": hmm_coords
             },
+            "classifier_route": {
+                "arc_ids": compressed_clf,
+                "polyline": clf_coords
+            },
             "reference_route": {
                 "polyline": ref_coords
             },
+            "road_network": network_segments,
             "metrics": {
                 "top1_classifier": round(top1_clf * 100.0, 2),
                 "top1_hmm": round(top1_hmm * 100.0, 2),

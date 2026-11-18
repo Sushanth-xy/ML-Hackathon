@@ -83,9 +83,11 @@
       <!-- Map Legend Overlay -->
       <div class="absolute bottom-5 left-5 z-[1000] bg-slate-900/95 backdrop-blur border border-slate-700/80 rounded-xl p-3 shadow-xl text-xs space-y-1.5">
         <div class="font-semibold text-slate-300 pb-1 border-b border-slate-800">Map Trajectory Layers</div>
-        <div class="flex items-center gap-2 text-slate-300"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> Raw GPS Observations</div>
-        <div class="flex items-center gap-2 text-slate-300"><span class="w-4 h-1 bg-emerald-500 inline-block rounded"></span> Ground-Truth Reference Route</div>
-        <div class="flex items-center gap-2 text-slate-300"><span class="w-4 h-1 bg-rose-500 inline-block rounded"></span> <b>HMM Reconstructed Route</b></div>
+        <div class="flex items-center gap-2 text-slate-400"><span class="w-4 h-1 bg-slate-500 inline-block rounded"></span> Road Network (Grey)</div>
+        <div class="flex items-center gap-2 text-slate-300"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> Raw GPS Points (Blue)</div>
+        <div class="flex items-center gap-2 text-slate-300"><span class="w-4 h-1 bg-emerald-500 inline-block rounded"></span> Ground Truth Route (Green)</div>
+        <div class="flex items-center gap-2 text-slate-300"><span class="w-4 h-1 bg-rose-500 inline-block rounded"></span> <b>HMM Reconstructed (Red)</b></div>
+        <div class="flex items-center gap-2 text-slate-400"><span class="w-4 h-1 bg-orange-400 inline-block rounded border-b border-dashed border-orange-500"></span> Classifier Only (Orange)</div>
       </div>
     </div>
 
@@ -172,21 +174,64 @@
 
   <script>
     let map = null;
+    let layerNetwork = null;
     let layerGps = null;
+    let layerClf = null;
     let layerRef = null;
     let layerHmm = null;
 
-    // Initialize Map
+    // Initialize Map with Switchable Basemaps
     function initMap() {
-      map = L.map('map', { zoomControl: true }).setView([12.9716, 77.5946], 13);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; CartoDB &copy; OpenStreetMap',
-        maxZoom: 19
-      }).addTo(map);
+      map = L.map('map', { zoomControl: true }).setView([56.2515, 54.9635], 14);
 
+      // CARTO Basemap Authentication Key
+      const CARTO_KEY = "cb1_5bgz_1_399372c17a577c3fe0aeb7b5";
+
+      // Basemap Providers
+      const cartoVoyager = L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?api_key=${CARTO_KEY}`, {
+        attribution: '&copy; CartoDB &copy; OpenStreetMap',
+        maxZoom: 19,
+        subdomains: 'abcd'
+      });
+      const osmStreets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+      });
+      const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '&copy; Esri World Imagery',
+        maxZoom: 19
+      });
+      const cartoDark = L.tileLayer(`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${CARTO_KEY}`, {
+        attribution: '&copy; CartoDB &copy; OpenStreetMap',
+        maxZoom: 19,
+        subdomains: 'abcd'
+      });
+
+      // Default basemap: Carto Voyager
+      cartoVoyager.addTo(map);
+
+      // Layers
+      layerNetwork = L.layerGroup().addTo(map);
       layerGps = L.layerGroup().addTo(map);
+      layerClf = L.layerGroup();
       layerRef = L.layerGroup().addTo(map);
       layerHmm = L.layerGroup().addTo(map);
+
+      // Layer Controls (Top Right)
+      const baseMaps = {
+        "Street Map (OSM)": osmStreets,
+        "Satellite Imagery": esriSatellite,
+        "Voyager": cartoVoyager,
+        "Dark Matter": cartoDark
+      };
+      const overlayMaps = {
+        "Road Network (Grey)": layerNetwork,
+        "Raw GPS (Blue)": layerGps,
+        "Reference Route (Green)": layerRef,
+        "HMM Route (Red)": layerHmm,
+        "Classifier Only (Orange)": layerClf
+      };
+      L.control.layers(baseMaps, overlayMaps, { position: 'topright' }).addTo(map);
     }
 
     function log(msg, type = "info") {
@@ -294,11 +339,24 @@
         document.getElementById("metaArcCount").innerText = data.predicted_route.arc_ids.length;
 
         // Render Layers
+        layerNetwork.clearLayers();
         layerGps.clearLayers();
+        layerClf.clearLayers();
         layerRef.clearLayers();
         layerHmm.clearLayers();
 
-        // 1. Raw GPS Observations
+        // 1. Background Road Network Arcs (Grey)
+        if (data.road_network && data.road_network.length > 0) {
+          data.road_network.forEach(seg => {
+            L.polyline(seg, {
+              color: '#94a3b8',
+              weight: 2,
+              opacity: 0.5
+            }).addTo(layerNetwork);
+          });
+        }
+
+        // 2. Raw GPS Observations (Blue)
         data.gps.forEach((pt, i) => {
           L.circleMarker(pt, {
             radius: 3.5,
@@ -309,7 +367,17 @@
           }).bindPopup(`<b>Observation ${i*2}</b><br>Lat: ${pt[0]}<br>Lon: ${pt[1]}`).addTo(layerGps);
         });
 
-        // 2. Reference Route
+        // 3. Classifier-Only Argmax Route (Orange dashed)
+        if (data.classifier_route && data.classifier_route.polyline.length > 0) {
+          L.polyline(data.classifier_route.polyline, {
+            color: '#f97316',
+            weight: 3.5,
+            dashArray: '6, 8',
+            opacity: 0.8
+          }).bindPopup("<b>Classifier-Only Argmax Route</b>").addTo(layerClf);
+        }
+
+        // 4. Ground-Truth Reference Route (Green)
         if (data.reference_route && data.reference_route.polyline.length > 0) {
           L.polyline(data.reference_route.polyline, {
             color: '#10b981',
@@ -318,7 +386,7 @@
           }).bindPopup("<b>Ground-Truth Reference Route</b>").addTo(layerRef);
         }
 
-        // 3. HMM Reconstructed Route
+        // 5. HMM Reconstructed Route (Red)
         if (data.predicted_route && data.predicted_route.polyline.length > 0) {
           const polyHmm = L.polyline(data.predicted_route.polyline, {
             color: '#ef4444',
