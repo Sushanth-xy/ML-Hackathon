@@ -96,6 +96,40 @@ All plots generated from actual experimental runs are available in `results/mode
 
 ---
 
+### 2.6 End-to-End Sequence & HMM Viterbi Decoder Results (Phase 2)
+*(Evaluated across all 10 student-test evaluator trips; logged in [`results/hmm/comparison.csv`](./results/hmm/comparison.csv) and [`results/hmm/per_trip.csv`](./results/hmm/per_trip.csv))*
+
+#### Overall Decoder Architecture Comparison:
+| Decoding Method | Observation Top-1 | 1-Hop Route Continuity | 2-Hop Route Continuity | Sequence Precision | Sequence Recall | Sequence F1 Score | Jaccard Similarity | Mean Latency / Trip |
+|---|---|---|---|---|---|---|---|---|
+| **Classifier Only (Argmax Baseline)** | 87.06% | 91.35% | 94.87% | 79.03% | 96.34% | 0.8659 | 76.75% | **1.7 ms** |
+| **Distance-Only HMM (No ML Probs)** | 94.49% | 99.21% | 99.66% | 90.28% | 97.73% | 0.9382 | 88.56% | 179.3 ms |
+| **HMM (Default Config + ML Probs)** | 91.92% | 97.62% | 99.39% | 90.65% | 98.18% | 0.9418 | 89.21% | 201.5 ms |
+| **HMM (Tuned Config + ML Probs)** | **93.23%** | **97.87%** | **99.50%** | **95.24%** | **98.22%** | **0.9669** | **93.65%** | **218.1 ms** |
+
+> **Key Architectural Takeaway:** The Tuned HMM Viterbi Decoder bridges isolated classifier errors using topological road graph reachability, boosting Sequence F1 from **0.8659 to 0.9669 (+10.10%)** and 1-hop physical route continuity from **91.35% to 97.87% (+6.52%)** in just ~218ms.
+
+---
+
+### 2.7 Per-Trip Evaluator Benchmark Summary (All 10 Student Test Trips)
+*(Live metrics executed via [`src/pipeline.py`](./src/pipeline.py) and verified across the two-laptop interface; logged in [`results/hmm/per_trip.csv`](./results/hmm/per_trip.csv))*
+
+| Trip ID | Observations ($N$) | Classifier Top-1 | HMM Tuned Top-1 | Net Top-1 Gain ($\Delta$) | 1-Hop Continuity | Sequence F1 | Total Latency |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| `00000000` | 2,503 pts | 93.59% | **95.51%** | +1.92% | 99.44% | 0.9392 | 308 ms |
+| `00000007` | 1,354 pts | 91.51% | **85.30%** | -6.21% *(discontinuity)* | 100.0% | 0.9878 | 156 ms |
+| `00000009` | 1,049 pts | 85.70% | **92.51%** | **+6.81%** | 95.42% | 0.9592 | 123 ms |
+| `00000040` | 2,995 pts | 91.74% | **95.23%** | **+3.49%** | 99.60% | 0.9868 | 337 ms |
+| `00000052` | 262 pts | 94.57% | **100.0%** | **+5.43%** | 96.55% | 1.0000 | 26 ms |
+| `00000056` | 3,958 pts | 88.89% | **96.60%** | **+7.71%** | 96.41% | 0.9577 | 396 ms |
+| `00000065` | 768 pts | 83.65% | **91.02%** | **+7.37%** | 97.52% | 0.9627 | 87 ms |
+| `00000076` | 1,486 pts | 85.72% | **97.25%** | **+11.53%** | 97.17% | 0.9611 | 181 ms |
+| `00000077` | 3,911 pts | 70.86% | **84.51%** | **+13.65%** | 99.67% | 0.9585 | 469 ms |
+| `00000091` | 874 pts | 84.33% | **94.35%** | **+10.02%** | 96.91% | 0.9560 | 96 ms |
+| **Overall Mean** | **1,916 pts** | **87.06%** | **93.23%** | **+6.17%** | **97.87%** | **0.9669** | **218 ms** |
+
+---
+
 ## 3. Evaluation Schedule & Panel Viva Defense Guide
 
 > **All team members must read and master this section.** Evaluators may direct questions to any member regardless of role to test individual understanding and authenticity.
