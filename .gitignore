@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 .venv/
 data/raw/
+data/*_candidates.csv
 *.parquet
 *.joblib
 *.ubj
